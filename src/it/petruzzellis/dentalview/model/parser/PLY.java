@@ -24,8 +24,8 @@ public class PLY {
 			this.name = name;
 		}
 
-		boolean list = false;
 		String type = null;
+		String listIdxType = null;
 		String name;
 	}
 
@@ -81,10 +81,6 @@ public class PLY {
 
 				byte[] buffer=new byte[remain];
 				raf.read(buffer);
-//				for (int i = 0; i < remain; i++) {
-//					byte b = raf.readByte();
-//					byteBuffer.put(b);
-//				}
 				byteBuffer.put(buffer);
 				byteBuffer.position(0);
 				try {
@@ -170,7 +166,7 @@ public class PLY {
 				mesh.vertex.add(vertex.get(coordIdx[0]).floatValue());
 				mesh.vertex.add(vertex.get(coordIdx[1]).floatValue());
 				mesh.vertex.add(vertex.get(coordIdx[2]).floatValue());
-				if (colorOk == 3) {
+				if (colorOk == 7) {
 					mesh.color.add(vertex.get(colorIdx[0]).floatValue());
 					mesh.color.add(vertex.get(colorIdx[1]).floatValue());
 					mesh.color.add(vertex.get(colorIdx[2]).floatValue());
@@ -186,7 +182,7 @@ public class PLY {
 					throw new Exception("ERROR: Only triangle rendering implemented");
 				} 
 				for(Number fvi:face)
-					mesh.faceVertexIndex.add((Byte)fvi);
+					mesh.faceVertexIndex.add(Byte.valueOf(fvi.byteValue()));
 			}
 			
 			mesh.initBuffer();
@@ -217,8 +213,8 @@ public class PLY {
 			} else if (parts[0].compareTo("property") == 0) {
 				Property p = new Property(parts[parts.length - 1]);
 				if (parts[1].compareTo("list") == 0) {
+					p.listIdxType = parts[2];
 					p.type = parts[3];
-					p.list = true;
 				} else {
 					p.type = parts[1];
 				}
@@ -232,7 +228,7 @@ public class PLY {
 		int offset = 0;
 		int cnt = 1;
 
-		if (element.properties.get(0).list) {
+		if (element.properties.get(0).listIdxType!=null) {
 			cnt = Integer.valueOf(parts[0]);
 			offset = 1;
 		} else {
@@ -275,22 +271,21 @@ public class PLY {
 	}
 
 	private void processDataBuffer(ArrayList<Element> elements) throws Exception{
+		int eidx=0;
 		for (Element element:elements) {
 			String type = element.properties.get(0).type;
-			boolean list = element.properties.get(0).list;
-			int valCnt;
-			if (list) {
-				valCnt = (Integer) parseType(type);
-			} else {
-				valCnt = element.properties.size();
-			}
+			String listIdxType = element.properties.get(0).listIdxType;
+			boolean list = listIdxType!=null;
+			int valCnt = element.properties.size();
 			for (int j = 0; j < element.size; j++) {
-				Log.i("PLYParser", "element "+j+" of "+element.size+" type "+type+" size "+valCnt+" buffer remaining "+byteBuffer.remaining());			
+				if (list) {
+					valCnt = (Integer) parseType(listIdxType);
+				}
+				//Log.i("PLYParser", "element "+element.type+" "+j+"/"+element.size+" read "+valCnt+" "+type+" buffer remaining "+byteBuffer.remaining());			
 				ArrayList<Number> data = new ArrayList<Number>();
 				for (int i = 0; i < valCnt; i++) {
 					data.add(parseType(type));
-				}
-				Log.i("PLYParser", "READ element "+j+" of "+element.size+" buffer remaining "+byteBuffer.remaining());			
+				}			
 				element.dataList.add(data);
 			}
 		}

@@ -32,7 +32,7 @@ public class OpenGLRenderer implements Renderer {
         gl.glClearDepthf(1.0f);
         gl.glEnable(GL10.GL_DEPTH_TEST);
         gl.glDepthFunc(GL10.GL_LEQUAL);
-
+        
         gl.glHint(GL10.GL_PERSPECTIVE_CORRECTION_HINT,
                   GL10.GL_NICEST);
             
@@ -42,7 +42,7 @@ public class OpenGLRenderer implements Renderer {
         gl.glClear(GL10.GL_COLOR_BUFFER_BIT | GL10.GL_DEPTH_BUFFER_BIT);        
         gl.glLoadIdentity();
         
-        gl.glTranslatef(0.0f, 0.0f, -1000.0f);
+        gl.glTranslatef(0.0f, 0.0f, -10.0f);
         gl.glRotatef(mMeshListRotation, 0.0f, 1.0f, 0.0f);
            
         for(Mesh m:mMeshList)
@@ -50,7 +50,7 @@ public class OpenGLRenderer implements Renderer {
            
         gl.glLoadIdentity();                                    
             
-        mMeshListRotation -= 0.15f; 
+        mMeshListRotation -= 0.5f; 
     }
 
     public void onSurfaceChanged(GL10 gl, int width, int height) {

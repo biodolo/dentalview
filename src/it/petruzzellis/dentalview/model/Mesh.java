@@ -63,7 +63,7 @@ public class Mesh {
         gl.glEnableClientState(GL10.GL_VERTEX_ARRAY);
         gl.glEnableClientState(GL10.GL_COLOR_ARRAY);
          
-        gl.glDrawElements(GL10.GL_TRIANGLES, faceVertexIndex.size(), GL10.GL_UNSIGNED_BYTE, mFaceVertexIndexBuffer);
+        gl.glDrawElements(GL10.GL_LINE_LOOP, faceVertexIndex.size(), GL10.GL_UNSIGNED_BYTE, mFaceVertexIndexBuffer);
             
         gl.glDisableClientState(GL10.GL_VERTEX_ARRAY);
         gl.glDisableClientState(GL10.GL_COLOR_ARRAY);
