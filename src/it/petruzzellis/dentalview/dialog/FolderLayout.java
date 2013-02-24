@@ -79,11 +79,14 @@ public class FolderLayout extends LinearLayout implements OnItemClickListener {
         }
         for (int i = 0; i < files.length; i++) {
             File file = files[i];
-            path.add(file.getPath());
-            if (file.isDirectory())
+            if (file.isDirectory()){
                 item.add(file.getName() + "/");
-            else if (file.getName().toLowerCase().endsWith("ply"))
-                item.add(file.getName());
+                path.add(file.getPath());
+            }
+            else if (file.getName().toLowerCase().endsWith("ply")){
+            	item.add(file.getName());
+                path.add(file.getPath());
+            }
 
         }
 

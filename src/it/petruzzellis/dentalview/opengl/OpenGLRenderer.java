@@ -2,6 +2,7 @@ package it.petruzzellis.dentalview.opengl;
 
 import it.petruzzellis.dentalview.model.Mesh;
 import it.petruzzellis.dentalview.model.parser.PLY;
+import it.petruzzellis.dentalview.model.parser.ply.Parser;
 
 import java.util.ArrayList;
 
@@ -13,17 +14,13 @@ import android.opengl.GLU;
 
 public class OpenGLRenderer implements Renderer {
 
-	private PLY parser = new PLY();
     private ArrayList<Mesh> mMeshList = new ArrayList<Mesh>();
-    private float mMeshListRotation;
+    private float mMeshListRotation=0.0f;
+    private int vn=2;
 
-    public OpenGLRenderer(String filename){
+    public OpenGLRenderer(ArrayList<Mesh> meshList){
     	super();
-    	try {
-			mMeshList.add(parser.loadModel(filename));
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
+    	mMeshList =meshList;
     }
     
     public void onSurfaceCreated(GL10 gl, EGLConfig config) {
@@ -42,15 +39,18 @@ public class OpenGLRenderer implements Renderer {
         gl.glClear(GL10.GL_COLOR_BUFFER_BIT | GL10.GL_DEPTH_BUFFER_BIT);        
         gl.glLoadIdentity();
         
-        gl.glTranslatef(0.0f, 0.0f, -10.0f);
+        gl.glTranslatef(0.0f, 0.0f, -100.0f);
         gl.glRotatef(mMeshListRotation, 0.0f, 1.0f, 0.0f);
            
-        for(Mesh m:mMeshList)
-        	m.draw(gl);
+        for(Mesh m:mMeshList){
+        	m.draw(gl);        	
+        }
            
         gl.glLoadIdentity();                                    
             
-        mMeshListRotation -= 0.5f; 
+        mMeshListRotation += 1.0f;
+        
+        
     }
 
     public void onSurfaceChanged(GL10 gl, int width, int height) {

@@ -1,5 +1,8 @@
 package it.petruzzellis.dentalview;
 
+import java.util.ArrayList;
+
+import it.petruzzellis.dentalview.model.Mesh;
 import it.petruzzellis.dentalview.opengl.OpenGLRenderer;
 import android.app.Activity;
 import android.opengl.GLSurfaceView;
@@ -19,8 +22,9 @@ public class OpenGLViewActivity extends Activity {
         
         GLSurfaceView view = new GLSurfaceView(this);
         Bundle extra = getIntent().getExtras();
-        String filename = extra.getString("scene");
-        OpenGLRenderer renderer= new OpenGLRenderer(filename);
+        @SuppressWarnings("unchecked")
+        ArrayList<Mesh> meshList = (ArrayList<Mesh>) extra.getSerializable("scene");
+        OpenGLRenderer renderer= new OpenGLRenderer(meshList);
         view.setRenderer(renderer);
         setContentView(view);
     }

@@ -1,6 +1,9 @@
 package it.petruzzellis.dentalview.model.parser;
 
 import it.petruzzellis.dentalview.model.Mesh;
+import it.petruzzellis.dentalview.model.parser.ply.FileFormat;
+import it.petruzzellis.dentalview.model.parser.ply.Property;
+import it.petruzzellis.dentalview.model.parser.ply.PropertyType;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -8,86 +11,75 @@ import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
+import java.util.Iterator;
 
 import android.util.Log;
 
 public class PLY {
-	private enum FileFormat {
-		ASCII, LITTLE_ENDIAN, BIG_ENDIAN
-	};
+
+	private static final String TAG = "PLYPARSER";;
 
 	private ByteBuffer byteBuffer;
 	private FileFormat fileFormat;
 
-	private class Property {
-		public Property(String name) {
-			this.name = name;
-		}
-
-		String type = null;
-		String listIdxType = null;
-		String name;
+	public Mesh loadModel2(String filename) throws Exception {
+		return loadModel2(filename, new float[] { 1.0f, 1.0f, 1.0f, 1.0f });
 	}
 
-	private class Element {
-		public Element(String type,int size) {
-			this.type = type;
-			this.size = size;
-		}
-		String type;
-		int size;
-		ArrayList<Property> properties = new ArrayList<Property>();
-		ArrayList<ArrayList<Number>> dataList = new ArrayList<ArrayList<Number>>();
-	};
-
-	public Mesh loadModel(String filename) throws Exception {
-		return loadModel(filename,new float[]{1.0f,1.0f,1.0f});
-	}
-	
-	public Mesh loadModel(String filename,float[] defaultColor) throws Exception {
-		if (defaultColor==null || defaultColor.length!=3)
-			throw new Exception("Wrong default vertex color "+String.valueOf(defaultColor));
-		ArrayList<Element> elements = new ArrayList<Element>();
+	public Mesh loadModel2(String filename, float[] color) throws Exception {
+		if (color == null || color.length < 3 || color.length > 4)
+			throw new Exception("Wrong default vertex color "
+					+ String.valueOf(color));
+		ArrayList<ElementWithDataList> elements = new ArrayList<ElementWithDataList>();
 		RandomAccessFile raf = null;
 		String line;
 		try {
 			raf = new RandomAccessFile(filename, "r");
 			line = raf.readLine();
 			if (line == null || line.compareTo("ply") != 0) {
-				throw new Exception("ERRROR: magic bytes 'ply' not found in file.");
+				throw new Exception(
+						"ERRROR: magic bytes 'ply' not found in file.");
 			}
 			do {
 				line = raf.readLine();
 				if (line != null)
-					processLine(line.split(" "),elements);
+					processLine(line.split(" "), elements);
 			} while (line.compareTo("end_header") != 0);
 			if (fileFormat == FileFormat.ASCII) {
-				Element element=elements.iterator().next();
+				Iterator<ElementWithDataList> it_e = elements.iterator();
+				ElementWithDataList element = it_e.next();
 				do {
 					line = raf.readLine();
-					if (line != null){
-						processDataLine(line.split(" "),element);
-						if (element.dataList.size() == element.size)
-							element=elements.iterator().next();
-					}
-				} while (line != null);
+					if (line != null) {
+						processDataLine(line.split(" "), element);
+						if (element.dataList.size() == element.size) {
+							if (it_e.hasNext()) {
+								element = it_e.next();
+							} else
+								break;
+						}
+
+					} else
+						break;
+
+				} while (true);
 			} else {
 				int remain = (int) (raf.length() - raf.getFilePointer());
 				byteBuffer = ByteBuffer.allocate(remain);
-				if (fileFormat == FileFormat.BIG_ENDIAN)
+				if (fileFormat == FileFormat.BINARY_BIG_ENDIAN)
 					byteBuffer.order(ByteOrder.BIG_ENDIAN);
 				else
 					byteBuffer.order(ByteOrder.LITTLE_ENDIAN);
 
-				byte[] buffer=new byte[remain];
+				byte[] buffer = new byte[remain];
 				raf.read(buffer);
 				byteBuffer.put(buffer);
 				byteBuffer.position(0);
 				try {
 					processDataBuffer(elements);
 				} catch (Exception e) {
-					throw new Exception("Couldn't parse model. "
-							+ e.toString() + " " + e.getMessage(),e);
+					throw new Exception("Couldn't parse model. " + e.toString()
+							+ " " + e.getMessage(), e);
 				}
 			}
 		} catch (FileNotFoundException e) {
@@ -99,18 +91,18 @@ public class PLY {
 				if (raf != null)
 					raf.close();
 			} catch (IOException e) {
-				Log.w("PLY PARSER","ERROR closing file: " + e.getMessage());
+				Log.w(TAG, "ERROR closing file: " + e.getMessage());
 			}
 		}
 		try {
 			byteBuffer = null;
-			Element vertexElement = null;
-			Element faceElement = null;
-			for (Element e : elements) {
-				if (e.type.compareTo("vertex") == 0) {
+			ElementWithDataList vertexElement = null;
+			ElementWithDataList faceElement = null;
+			for (ElementWithDataList e : elements) {
+				if (e.stringType.compareTo("vertex") == 0) {
 					vertexElement = e;
 				}
-				if (e.type.compareTo("face") == 0) {
+				if (e.stringType.compareTo("face") == 0) {
 					faceElement = e;
 				}
 				if (vertexElement != null && faceElement != null)
@@ -118,117 +110,115 @@ public class PLY {
 			}
 
 			if (vertexElement == null) {
-				throw new Exception("ERROR: .ply file doesn't contain vertex definition.");
+				throw new Exception(
+						"ERROR: .ply file doesn't contain vertex definition.");
 			}
 
 			if (faceElement == null) {
-				throw new Exception("ERROR: .ply file doesn't contain face definition.");
+				throw new Exception(
+						"ERROR: .ply file doesn't contain face definition.");
 			}
 
-			Mesh mesh = new Mesh();
-
-			int coordIdx[] = new int[] { -1, -1, -1 };
-			int colorIdx[] = new int[] { -1, -1, -1 };
-			int coordOk = 0;
-			int colorOk = 0;
-			for (int i = 0; i < vertexElement.properties.size(); i++) {
-				Property p = vertexElement.properties.get(i);
-				if (p.name.equals("x")) {
-					coordIdx[0] = i;
-					coordOk|=1;
-				} else if (p.name.equals("y")) {
-					coordIdx[1] = i;
-					coordOk|=2;
-				} else if (p.name.equals("z")) {
-					coordIdx[2] = i;
-					coordOk|=4;
-				} else if (p.name.equals("red")) {
-					colorIdx[0] = i;
-					colorOk|=1;
-				} else if (p.name.equals("green")) {
-					colorIdx[1] = i;
-					colorOk|=2;
-				} else if (p.name.equals("blue")) {
-					colorIdx[2] = i;
-					colorOk|=4;
-				}
-			}
-
-			if (coordOk != 7) {
-				throw new Exception("ERROR: x,y,z not properly defined for vertices in header.");
-			}
-
-			for (ArrayList<Number> vertex : vertexElement.dataList) {
-				if (vertex.size() < 3) {
-					throw new Exception("ERROR: invalid vertex coordinate count: "
-									+ vertex.size() + " for vertex index ");
-				}
-				mesh.vertex.add(vertex.get(coordIdx[0]).floatValue());
-				mesh.vertex.add(vertex.get(coordIdx[1]).floatValue());
-				mesh.vertex.add(vertex.get(coordIdx[2]).floatValue());
-				if (colorOk == 7) {
-					mesh.color.add(vertex.get(colorIdx[0]).floatValue());
-					mesh.color.add(vertex.get(colorIdx[1]).floatValue());
-					mesh.color.add(vertex.get(colorIdx[2]).floatValue());
-				}else{
-					mesh.color.add(defaultColor[0]);
-					mesh.color.add(defaultColor[1]);
-					mesh.color.add(defaultColor[2]);
-				}
-			}
-
-			for (ArrayList<Number> face : faceElement.dataList) {
-				if (face.size() != 3) {
-					throw new Exception("ERROR: Only triangle rendering implemented");
-				} 
-				for(Number fvi:face)
-					mesh.faceVertexIndex.add(Byte.valueOf(fvi.byteValue()));
-			}
-			
-			mesh.initBuffer();
-			return mesh;
+			return meshFromElement(vertexElement, faceElement, color);
 		} catch (Exception e) {
 			throw new Exception("Couldn't parse model. " + e.toString() + " "
-					+ e.getMessage(),e);
+					+ e.getMessage(), e);
 		}
-		
+
 	}
 
+	public Mesh meshFromElement(ElementWithDataList vertexElement,
+			ElementWithDataList faceElement) throws Exception {
+		return meshFromElement(vertexElement, faceElement, new float[] { 1.0f,
+				1.0f, 1.0f, 1.0f });
+	}
 
-	private void processLine(String parts[],ArrayList<Element> elements)throws Exception {
-		if (parts.length > 2){
+	public Mesh meshFromElement(ElementWithDataList vertexElement,
+			ElementWithDataList faceElement, float[] color) throws Exception {
+
+		int coordIdx[] = new int[] { -1, -1, -1 };
+		int coordOk = 0;
+		for (int i = 0; i < vertexElement.properties.size(); i++) {
+			Property p = vertexElement.properties.get(i);
+			if (p.name.equals("x")) {
+				coordIdx[0] = i;
+				coordOk |= 1;
+			} else if (p.name.equals("y")) {
+				coordIdx[1] = i;
+				coordOk |= 2;
+			} else if (p.name.equals("z")) {
+				coordIdx[2] = i;
+				coordOk |= 4;
+			}
+		}
+
+		if (coordOk != 7) {
+			throw new Exception(
+					"ERROR: x,y,z not properly defined for vertices in header.");
+		}
+
+		float[] mesh_vertex = new float[faceElement.dataList.size() * 3 * 3];// 3
+																				// vertici
+																				// da
+																				// 3
+																				// coordinate
+		int v = 0;
+		int f = 0;
+		for (ArrayList<Number> face : faceElement.dataList) {
+			if (face.size() != 3) {
+				throw new Exception(
+						"ERROR: Only triangle rendering implemented");
+			}
+			f += 1;
+			if (f % 1000 == 0) {
+				Log.d(TAG, "Face " + f + " vertex " + v);
+			}
+			for (Number fvi : face) {
+				ArrayList<Number> vertex = vertexElement.dataList.get(fvi
+						.intValue());
+				mesh_vertex[v++] = (vertex.get(coordIdx[0]).floatValue());
+				mesh_vertex[v++] = (vertex.get(coordIdx[1]).floatValue());
+				mesh_vertex[v++] = (vertex.get(coordIdx[2]).floatValue());
+			}
+		}
+		return new Mesh(mesh_vertex);
+	}
+
+	private void processLine(String parts[],
+			ArrayList<ElementWithDataList> elements) throws Exception {
+		if (parts.length > 2) {
 			if (parts[0].compareTo("format") == 0) {
 				if (parts[1].compareTo("ascii") == 0)
 					fileFormat = FileFormat.ASCII;
 				else if (parts[1].compareTo("binary_little_endian") == 0)
-					fileFormat = FileFormat.LITTLE_ENDIAN;
+					fileFormat = FileFormat.BINARY_LITTLE_ENDIAN;
 				else if (parts[1].compareTo("binary_big_endian") == 0)
-					fileFormat = FileFormat.BIG_ENDIAN;
+					fileFormat = FileFormat.BINARY_BIG_ENDIAN;
 				else {
-					throw new Exception("ERROR: " + parts[0] + " header unknown: "
-							+ parts[1]);
+					throw new Exception("ERROR: " + parts[0]
+							+ " header unknown: " + parts[1]);
 				}
 			} else if (parts[0].compareTo("element") == 0) {
-				elements.add(new Element(parts[1], Integer.valueOf(parts[2])));
+				elements.add(new ElementWithDataList(parts[1], Integer
+						.valueOf(parts[2])));
 			} else if (parts[0].compareTo("property") == 0) {
 				Property p = new Property(parts[parts.length - 1]);
 				if (parts[1].compareTo("list") == 0) {
-					p.listIdxType = parts[2];
-					p.type = parts[3];
+					p.listIdxType = PropertyType.valueOf(parts[2]);
+					p.type = PropertyType.valueOf(parts[3]);
 				} else {
-					p.type = parts[1];
+					p.type = PropertyType.valueOf(parts[1]);
 				}
 				elements.get(elements.size() - 1).properties.add(p);
 			}
 		}
 	}
 
-
-	private void processDataLine(String parts[],Element element) {
+	private void processDataLine(String parts[], ElementWithDataList element) {
 		int offset = 0;
 		int cnt = 1;
 
-		if (element.properties.get(0).listIdxType!=null) {
+		if (element.properties.get(0).listIdxType != null) {
 			cnt = Integer.valueOf(parts[0]);
 			offset = 1;
 		} else {
@@ -240,54 +230,69 @@ public class PLY {
 			l.add(Float.valueOf(parts[i]));
 		}
 		element.dataList.add(l);
-		
+
 	}
 
-
-	private Number parseType(String type) throws Exception {
-		if (type.equals("char") || type.equals("uchar")) {
+	private Number parseType(PropertyType type) throws Exception {
+		short s;
+		int i;
+		switch (type) {
+		case CHAR:
+		case UCHAR:
+		case INT8:
+		case UINT8:
 			return Integer.valueOf(byteBuffer.get());
-		} else if (type.equals("short")) {
-			short c = byteBuffer.getShort();
-			return Integer.valueOf(c);
-		} else if (type.equals("ushort")) {
-			short c = byteBuffer.getShort();
-			int v = Integer.valueOf(c);
-			v += 32768; 
-			return Integer.valueOf(v);
-		} else if (type.equals("int")) {
+		case SHORT:
+		case INT16:
+			s = byteBuffer.getShort();
+			return Integer.valueOf(s);
+		case USHORT:
+		case UINT16:
+			s = byteBuffer.getShort();
+			i = Integer.valueOf(s);
+			i += 32768;
+			return Integer.valueOf(i);
+		case INT:
+		case INT32:
 			return Integer.valueOf(byteBuffer.getInt());
-		} else if (type.equals("uint")) {
-			int v = byteBuffer.getInt();
-			v += 2147483648l; 
-			return Integer.valueOf(v);
-		} else if (type.equals("float")) {
+		case UINT:
+		case UINT32:
+			i = byteBuffer.getInt();
+			i += 2147483648l;
+			return Integer.valueOf(i);
+		case FLOAT:
+		case FLOAT32:
 			return Float.valueOf(byteBuffer.getFloat());
-		} else if (type.equals("double")) {
+		case DOUBLE:
+		case FLOAT64:
 			return Double.valueOf(byteBuffer.getDouble());
-		} else {
+		default:
 			throw new Exception("ERROR: invalid data type: " + type);
 		}
 	}
 
-	private void processDataBuffer(ArrayList<Element> elements) throws Exception{
-		int eidx=0;
-		for (Element element:elements) {
-			String type = element.properties.get(0).type;
-			String listIdxType = element.properties.get(0).listIdxType;
-			boolean list = listIdxType!=null;
+	private void processDataBuffer(ArrayList<ElementWithDataList> elements)
+			throws Exception {
+		for (ElementWithDataList element : elements) {
+			PropertyType type = element.properties.get(0).type;
+			PropertyType listIdxType = element.properties.get(0).listIdxType;
+			boolean list = listIdxType != null;
 			int valCnt = element.properties.size();
 			for (int j = 0; j < element.size; j++) {
 				if (list) {
 					valCnt = (Integer) parseType(listIdxType);
 				}
-				//Log.i("PLYParser", "element "+element.type+" "+j+"/"+element.size+" read "+valCnt+" "+type+" buffer remaining "+byteBuffer.remaining());			
+				if (j % 1000 == 0)
+					Log.d(TAG, "element " + element.stringType + " " + j + "/"
+							+ element.size + " read " + valCnt + " " + type
+							+ " buffer remaining " + byteBuffer.remaining());
 				ArrayList<Number> data = new ArrayList<Number>();
 				for (int i = 0; i < valCnt; i++) {
 					data.add(parseType(type));
-				}			
+				}
 				element.dataList.add(data);
 			}
 		}
 	}
+
 }
