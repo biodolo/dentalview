@@ -29,6 +29,7 @@ public class FolderLayout extends LinearLayout implements OnItemClickListener {
     private String root = "/";
     private TextView myPath;
     private ListView lstView;
+    private static final String filter=".sdc";
 
     public FolderLayout(Context context, AttributeSet attrs) {
         super(context, attrs);
@@ -83,7 +84,7 @@ public class FolderLayout extends LinearLayout implements OnItemClickListener {
                 item.add(file.getName() + "/");
                 path.add(file.getPath());
             }
-            else if (file.getName().toLowerCase().endsWith("ply")){
+            else if (file.getName().toLowerCase().endsWith(filter)){
             	item.add(file.getName());
                 path.add(file.getPath());
             }

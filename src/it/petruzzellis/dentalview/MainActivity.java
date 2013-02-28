@@ -4,6 +4,7 @@ import it.petruzzellis.dentalview.dialog.FolderLayout;
 import it.petruzzellis.dentalview.dialog.IFolderItemListener;
 import it.petruzzellis.dentalview.model.Mesh;
 import it.petruzzellis.dentalview.model.parser.ply.Parser;
+import it.petruzzellis.dentalview.scene.Scene;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -11,6 +12,9 @@ import java.io.FileOutputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.util.ArrayList;
+
+import org.simpleframework.xml.Serializer;
+import org.simpleframework.xml.core.Persister;
 
 import android.app.Activity;
 import android.app.AlertDialog;
@@ -62,30 +66,43 @@ public class MainActivity extends Activity implements IFolderItemListener {
 
     //Your stuff here for file Click
     public void OnFileClicked(File file) throws Exception {
-        new AsyncTask<File, Integer, ArrayList<Mesh>>() {
+        new AsyncTask<File, Integer, Scene>() {
 
-        @SuppressWarnings("unchecked")
         @Override
-        protected void onPostExecute(ArrayList<Mesh> result) {
+        protected void onPostExecute(Scene result) {
             super.onPostExecute(result);
-            FileOutputStream fos;
-            Intent intent = new Intent(MainActivity.this, OpenGLViewActivity.class);
-            Bundle b = new Bundle();
-            b.putSerializable("scene", result);
-            intent.putExtras(b); 
-            startActivity(intent);
+            if (result!=null){
+                Intent intent = new Intent(MainActivity.this, OpenGLViewActivity.class);
+                Bundle b = new Bundle();
+                b.putSerializable("scene", result);
+                intent.putExtras(b); 
+                startActivity(intent);
+            }else{
+                new AlertDialog.Builder(MainActivity.this)
+                .setIcon(R.drawable.ic_launcher)
+                .setTitle("Error occurred during scene parsing")
+                .setPositiveButton("OK",
+                        new DialogInterface.OnClickListener() {
+
+                            public void onClick(DialogInterface dialog,
+                                    int which) {
+
+
+                            }
+                        }).show();
+            }
         }
         
         @Override
-        protected ArrayList<Mesh> doInBackground(File... params) {
-            Parser parser = new Parser();
-            ArrayList<Mesh> meshList = new ArrayList<Mesh>();
+        protected Scene doInBackground(File... params) {
+            Scene result=null;
+            Serializer serializer= new Persister();
             try {
-                meshList.add(parser.loadModel(params[0]));
+                result=serializer.read(Scene.class, params[0]);
             } catch (Exception e) {
                 e.printStackTrace();
             }
-            return meshList;
+            return result;
         }
 
     }.execute(file);

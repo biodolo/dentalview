@@ -4,12 +4,15 @@ import it.petruzzellis.dentalview.model.Mesh;
 
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.ObjectOutputStream;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
 import android.annotation.SuppressLint;
+import android.os.Environment;
 import android.util.Log;
 
 @SuppressLint("DefaultLocale")
@@ -17,25 +20,17 @@ import android.util.Log;
 public class Parser {
     private static final String TAG = "PLYPARSER";;
 
+    private static final File datafolder=Environment.getDataDirectory();
+
     private FileFormat fileFormat = null;
     private Element vertexElement = null;
     private Element faceElement = null;
 
     private int parseStatus = 0;
     int coordIdx[] = new int[] { -1, -1, -1 };
-
-    public Mesh loadModel(String filename) throws Exception {
-        return loadModel(filename, new float[] { 1.0f, 1.0f, 1.0f, 1.0f });
-    }
-
-    public Mesh loadModel(File file) throws Exception {
-        return loadModel(file, new float[] { 1.0f, 1.0f, 1.0f, 1.0f });
-    }
-
-    public Mesh loadModel(String filename, float[] color) throws Exception {
-        return loadModel(new File(filename), color);        
-    }
-
+    
+    
+    
     public Mesh loadModel(File file, float[] color) throws Exception {
         if (color == null || color.length < 3 || color.length > 4)
             throw new Exception("Wrong default vertex color " + String.valueOf(color));
